@@ -10,6 +10,6 @@ Self-contained projects are created to solve specific tasks of building interfac
 * Data Visualization
 
 
-Interim project goals:
+Project objectives:
 
 Use an ESP32 as a sensor proxy to override temperature measurments taken by the heatpump.
