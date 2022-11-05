@@ -12,4 +12,4 @@ Self-contained projects are created to solve specific tasks of building interfac
 
 Interim project goals:
 
-Use an ESP32 as an temperature sensor proxy to override measurments used by the heatpump.
+Use an ESP32 as a sensor proxy to override temperature measurments taken by the heatpump.
