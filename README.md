@@ -8,3 +8,8 @@ Self-contained projects are created to solve specific tasks of building interfac
 * Online Weather forecast service
 * Online Electric energy price forecast service* 
 * Data Visualization
+
+
+Interim project goals:
+
+Use an ESP32 as an temperature sensor proxy to override measurments used by the heatpump.
