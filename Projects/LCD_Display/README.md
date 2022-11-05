@@ -1,6 +1,11 @@
 Description:
 
-The sketch displays a "hello, world!" string and a counter variable.
+The sketch displays a "hello, world!" welcome message and a counter variable.
+
+
+<p align="center">
+  <img src="https://github.com/sensorius/Calefactio/blob/main/Blobs/Calefactio_LCD_00.jpg?raw=true" alt="LCD display"/>
+</p>
 
 
 Hardware:
