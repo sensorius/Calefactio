@@ -16,7 +16,7 @@ void setup() {
 
 void loop() {
   
-  // read the value from the analog channel
+  // read the value from the analog channel (default: 12 bits (0 – 4095) resolution)
   iDigitalValue = analogRead(iPotPin);
   Serial.print("digital value = ");
   Serial.print(iDigitalValue);      
