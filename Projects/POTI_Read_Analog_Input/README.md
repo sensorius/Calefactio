@@ -1,6 +1,6 @@
 Description:
 
-The sketch reads a value from an attached potentiometer and prints those values in the Serial Monitor.<br>
+The sketch reads a value from an attached 10K potentiometer and prints those values in the Serial Monitor.<br>
 
 <p align="center">
   <img src="https://github.com/sensorius/Calefactio/blob/main/Blobs/Calefactio_POTI_ADC_34_00.jpg?raw=true" alt="Poti ADC"/>
