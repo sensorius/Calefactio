@@ -15,7 +15,7 @@ ESP's ADC is not perfectly linear therefore you might get identical values for 3
 
 Source: https://w4krl.com/esp32-analog-to-digital-conversion-accuracy/
 
-
+More information about ESP32's Analog to Digital Converter (ADC) is available here: https://www.upesy.com/blogs/tutorials/measure-voltage-on-esp32-with-adc-with-arduino-code
 
 Hardware:
 
