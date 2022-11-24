@@ -20,7 +20,7 @@ const char* ssid = "YOUR_SSID";
 const char* password = "YOUR_PASSWORD";
                               
 String strRequestDataFromServer = "https://api.openweathermap.org/data/2.5/"\
-                                  "forecast?q=L%C3%B8kken,DK&units=metric&"\
+                                  "weather?q=L%C3%B8kken,DK&units=metric&"\
                                   "appid=YOUR_APPID";
                           
 
@@ -47,7 +47,7 @@ void setup() {
   lcd.init();                     // LCD driver initialization
   lcd.backlight();                // Open the backlight
   lcd.setCursor(0,0);             // Move the cursor to row 0, column 0
-  lcd.print("Connecting to:");        // The print content is displayed on the LCD
+  lcd.print("Connecting to:");    // The print content is displayed on the LCD
   lcd.setCursor(0,1);             // Move the cursor to row 0, column 0
   String str = ssid;
   lcd.print(str);        // The print content is displayed on the LCD
