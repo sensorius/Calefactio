@@ -27,12 +27,10 @@ String strRequestDataFromServer = "https://api.openweathermap.org/data/2.5/"\
 unsigned long timerDelay = 60000*5;  // 5 minutes
 unsigned long lastTime = timerDelay;
 
-String strTemperature = "?";
-String strWindspeed = "?";
 
 struct webDataType {
-String strTemperature = "?";
-String strWindspeed = "?";
+  String strTemperature = "?";
+  String strWindspeed = "?";
 };
 
   
@@ -77,8 +75,6 @@ void setup() {
 }
 
 webDataType getDataFromServer(String strRequest) {
-
-  String strRetVal = "n/a";
   if(WiFi.status()== WL_CONNECTED){
       HTTPClient http;
 
@@ -97,7 +93,6 @@ webDataType getDataFromServer(String strRequest) {
 
         // Get numeric data we are interested in -> <SNIP> main":{"temp":7.3,"fee <SNIP>
         
-
         int iValuePosStart = payload.indexOf("temp")+6;
         int iValuePosEnd = payload.indexOf(",",iValuePosStart );
         myWebData.strTemperature = payload.substring(iValuePosStart,iValuePosEnd);
@@ -105,7 +100,6 @@ webDataType getDataFromServer(String strRequest) {
         iValuePosStart = payload.indexOf("speed")+7;
         iValuePosEnd = payload.indexOf(",",iValuePosStart );
         myWebData.strWindspeed = payload.substring(iValuePosStart,iValuePosEnd);
-
         
       }
       else {
@@ -122,7 +116,7 @@ webDataType getDataFromServer(String strRequest) {
 }
 
 void loop() {
-  //Send an HTTP POST request every 10 minutes
+  //Send an HTTP POST request every 5 minutes
   if ((millis() - lastTime) > timerDelay) {
     
     myWebData = getDataFromServer(strRequestDataFromServer);
