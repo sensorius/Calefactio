@@ -6,5 +6,8 @@ This sketch requests mean temperature und wind_speed from DMI and displays the d
   <img src="https://github.com/sensorius/Calefactio/blob/main/Blobs/Calefactio_DMI_Weather_Station-00.jpg?raw=true" alt="DMI Weather Station"/>
 </p>
 
+Libraries used:
 
-NTPClient by Fabrice Weinberg V3.2.1
+* LiquidCrystal_I2C by Marco Schwartz Version 1.1.2
+* OneWire by Paul Stoffregen Version 2.3.7
+* NTPClient by Fabrice Weinberg Version 3.2.1
