@@ -1,5 +1,3 @@
-
-
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <LiquidCrystal_I2C.h>
@@ -20,21 +18,25 @@ const long utcOffsetInSeconds = 3600;
 
 const char* ssid = "YOUR_SSID";
 const char* password = "YOUR_PASSWORD";
-
-
-String strRequestDataTempFromServer = "http://dmigw.govcloud.dk/v2/climateData/collections/10kmGridValue/items?"\
-                                  "cellId=10km_635_54&limit=1&parameterId=mean_temp&api-key="\
-                                  "YOUR_APIKEY";
                               
-String strRequestDataWindSpeedFromServer = "http://dmigw.govcloud.dk/v2/climateData/collections/10kmGridValue/items?"\
-                                  "cellId=10km_635_54&limit=1&parameterId=mean_wind_speed&api-key="\
-                                  "YOUR_APIKEY";
+String strRequestDataFromServer = "https://api.openweathermap.org/data/2.5/"\
+                                  "forecast?q=L%C3%B8kken,DK&units=metric&"\
+                                  "appid=YOUR_APPID";
+                          
 
 unsigned long timerDelay = 60000*5;  // 5 minutes
 unsigned long lastTime = timerDelay;
 
-String strTemperature = "n/a";
-String strWindspeed = "n/a";
+String strTemperature = "?";
+String strWindspeed = "?";
+
+struct webDataType {
+String strTemperature = "?";
+String strWindspeed = "?";
+};
+
+  
+struct webDataType myWebData;
 
 LiquidCrystal_I2C lcd(0x27,lcdColumns,lcdRows); 
 WiFiUDP ntpUDP;
@@ -42,7 +44,6 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
 
 void setup() {
   Serial.begin(115200); 
-
 
   Wire.begin(SDA, SCL);           // attach the IIC pin
   lcd.init();                     // LCD driver initialization
@@ -75,7 +76,7 @@ void setup() {
   lcd.clear();
 }
 
-String getDataFromServer(String strRequest) {
+webDataType getDataFromServer(String strRequest) {
 
   String strRetVal = "n/a";
   if(WiFi.status()== WL_CONNECTED){
@@ -92,11 +93,19 @@ String getDataFromServer(String strRequest) {
         Serial.println(httpResponseCode);
         String payload = http.getString();
 
-        // Get numeric data we are interested in -> <SNIP> 00+01:00","value":6.3}}],"timeSta <SNIP>
+        Serial.println(payload);
+
+        // Get numeric data we are interested in -> <SNIP> main":{"temp":7.3,"fee <SNIP>
         
-        int iValuePosStart = payload.indexOf("value")+7;
-        int iValuePosEnd = payload.indexOf("}}]",iValuePosStart );
-        strRetVal = payload.substring(iValuePosStart,iValuePosEnd);
+
+        int iValuePosStart = payload.indexOf("temp")+6;
+        int iValuePosEnd = payload.indexOf(",",iValuePosStart );
+        myWebData.strTemperature = payload.substring(iValuePosStart,iValuePosEnd);
+
+        iValuePosStart = payload.indexOf("speed")+7;
+        iValuePosEnd = payload.indexOf(",",iValuePosStart );
+        myWebData.strWindspeed = payload.substring(iValuePosStart,iValuePosEnd);
+
         
       }
       else {
@@ -109,33 +118,29 @@ String getDataFromServer(String strRequest) {
     else {
       Serial.println("WiFi Disconnected");
     }
-    return strRetVal;
+    return myWebData;
 }
 
 void loop() {
   //Send an HTTP POST request every 10 minutes
   if ((millis() - lastTime) > timerDelay) {
-
-    strTemperature = getDataFromServer(strRequestDataTempFromServer);
-    Serial.println("Current outdoor temperature: "+strTemperature+"°C");
-    //lcd.setCursor(0,0);           
-    //lcd.print(strWindspeed+"\xDF""C");          
-
-    strWindspeed = getDataFromServer(strRequestDataWindSpeedFromServer);
-    Serial.println("Current wind speed "+strWindspeed+"m/s");
-    //lcd.print(" "+strWindspeed+"m/s");
-
+    
+    myWebData = getDataFromServer(strRequestDataFromServer);
+    Serial.println("Current outdoor temperature: "+myWebData.strTemperature+"°C");
+    Serial.println("Current wind speed "+myWebData.strWindspeed+"m/s");
+    
     lastTime = millis();
   }
   
   timeClient.update();
 
-  lcd.setCursor(4,0);             
+  lcd.setCursor(4,0);             // Move the cursor to row 0, column 4
   lcd.print(timeClient.getFormattedTime()); 
-  lcd.setCursor(0,1);            
-  lcd.print(strTemperature+"\xDF""C");
-  lcd.setCursor(lcdColumns-strWindspeed.length()-3,1);  // Align output to the right          
-  lcd.print(strWindspeed+"m/s");
+  lcd.setCursor(0,1);             // Move the cursor to row 1, column 0 
+  lcd.print(myWebData.strTemperature+"\xDF""C");
+  lcd.setCursor(lcdColumns-myWebData.strWindspeed.length()-3,1);  // Align left          
+  lcd.print(myWebData.strWindspeed+"m/s");
+
   delay(1000);
-    
+
 }
