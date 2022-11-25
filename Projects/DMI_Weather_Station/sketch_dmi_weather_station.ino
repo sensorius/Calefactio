@@ -22,19 +22,34 @@ const char* password = "YOUR_PASSWORD";
 String strRequestDataFromServer = "https://api.openweathermap.org/data/2.5/"\
                                   "weather?q=L%C3%B8kken,DK&units=metric&"\
                                   "appid=YOUR_APPID";
+
+String strRequestDataForecastFromServer = "https://api.openweathermap.org/data/2.5/"\
+                                  "forecast?q=L%C3%B8kken,DK&units=metric&"\
+                                  "appid=YOUR_APPID";
                           
 
-unsigned long timerDelay = 60000*5;  // 5 minutes
+unsigned long timerDelay = 60000*5;            // 5 minutes
+unsigned long timerDelayForecast = 60000*60;   // 1 hour
 unsigned long lastTime = timerDelay;
+unsigned long lastTimeForecast = timerDelayForecast;
 
+#define MAX_FORECAST_COUNT 16 
 
 struct webDataType {
-  String strTemperature = "?";
-  String strWindspeed = "?";
+String strTemperature = "?";
+String strWindspeed = "?";
+String strArrayForecastWindspeed[MAX_FORECAST_COUNT] = {};
+String strArrayForecastDateTime[MAX_FORECAST_COUNT] = {};
 };
 
-  
 struct webDataType myWebData;
+
+
+
+const int iPotPin = 34;
+int iDigitalValue = 0; // variable to store the value coming from the sensor
+
+
 
 LiquidCrystal_I2C lcd(0x27,lcdColumns,lcdRows); 
 WiFiUDP ntpUDP;
@@ -47,7 +62,7 @@ void setup() {
   lcd.init();                     // LCD driver initialization
   lcd.backlight();                // Open the backlight
   lcd.setCursor(0,0);             // Move the cursor to row 0, column 0
-  lcd.print("Connecting to:");    // The print content is displayed on the LCD
+  lcd.print("Connecting to:");        // The print content is displayed on the LCD
   lcd.setCursor(0,1);             // Move the cursor to row 0, column 0
   String str = ssid;
   lcd.print(str);        // The print content is displayed on the LCD
@@ -70,11 +85,12 @@ void setup() {
 
   timeClient.begin();
   
-  delay(3000);
+  delay(15000);
   lcd.clear();
 }
 
 webDataType getDataFromServer(String strRequest) {
+
   if(WiFi.status()== WL_CONNECTED){
       HTTPClient http;
 
@@ -92,14 +108,49 @@ webDataType getDataFromServer(String strRequest) {
         Serial.println(payload);
 
         // Get numeric data we are interested in -> <SNIP> main":{"temp":7.3,"fee <SNIP>
-        
-        int iValuePosStart = payload.indexOf("temp")+6;
-        int iValuePosEnd = payload.indexOf(",",iValuePosStart );
-        myWebData.strTemperature = payload.substring(iValuePosStart,iValuePosEnd);
 
-        iValuePosStart = payload.indexOf("speed")+7;
-        iValuePosEnd = payload.indexOf(",",iValuePosStart );
-        myWebData.strWindspeed = payload.substring(iValuePosStart,iValuePosEnd);
+        int iValuePosStart = 0;
+        int iValuePosEnd = 0;
+
+        if( strRequest.indexOf("weather?") >= 0 ) {
+          Serial.println("Extracting weather data");
+          
+          int iValuePosStart = payload.indexOf("temp")+6;
+          int iValuePosEnd = payload.indexOf(",",iValuePosStart );
+          myWebData.strTemperature = payload.substring(iValuePosStart,iValuePosEnd);
+
+          iValuePosStart = payload.indexOf("speed")+7;
+          iValuePosEnd = payload.indexOf(",",iValuePosStart );
+          myWebData.strWindspeed = payload.substring(iValuePosStart,iValuePosEnd);
+        } else if ( strRequest.indexOf("forecast?") >= 0  ) {
+          Serial.println("Extracting forecast data");
+
+          iValuePosStart = 0;
+          iValuePosEnd = 0;
+          for( int iCounter = 0; iCounter <MAX_FORECAST_COUNT; iCounter++ ) {
+            iValuePosStart = payload.indexOf("speed",iValuePosStart)+7;
+            iValuePosEnd = payload.indexOf(",",iValuePosStart );
+            myWebData.strArrayForecastWindspeed[iCounter] = payload.substring(iValuePosStart,iValuePosEnd);
+            Serial.println("Data:"+myWebData.strArrayForecastWindspeed[iCounter]);
+          }
+
+          iValuePosStart = 0;
+          iValuePosEnd = 0;
+          for( int iCounter = 0; iCounter <MAX_FORECAST_COUNT; iCounter++ ) {
+            iValuePosStart = payload.indexOf("dt_txt",iValuePosStart)+9;
+            iValuePosEnd = payload.indexOf(",",iValuePosStart )-5;
+            myWebData.strArrayForecastDateTime[iCounter] = payload.substring(iValuePosStart,iValuePosEnd);
+            Serial.println("Data:"+myWebData.strArrayForecastDateTime[iCounter]);
+          }
+          
+          
+        } else {
+          
+          Serial.println("Error - Check HTML Request:");
+          Serial.println(strRequest);
+        } 
+        
+        
         
       }
       else {
@@ -116,7 +167,9 @@ webDataType getDataFromServer(String strRequest) {
 }
 
 void loop() {
-  //Send an HTTP POST request every 5 minutes
+
+  static int iPosOld = -1;
+
   if ((millis() - lastTime) > timerDelay) {
     
     myWebData = getDataFromServer(strRequestDataFromServer);
@@ -125,16 +178,48 @@ void loop() {
     
     lastTime = millis();
   }
-  
+
+  if ((millis() - lastTimeForecast) > timerDelayForecast) {
+    
+    myWebData = getDataFromServer(strRequestDataForecastFromServer);
+    //Serial.println("Current outdoor temperature: "+myWebData.strTemperature+"°C");
+    //Serial.println("Current wind speed "+myWebData.strWindspeed+"m/s");
+    
+    lastTimeForecast = millis();
+  }
+
   timeClient.update();
 
-  lcd.setCursor(4,0);             // Move the cursor to row 0, column 4
-  lcd.print(timeClient.getFormattedTime()); 
-  lcd.setCursor(0,1);             // Move the cursor to row 1, column 0 
-  lcd.print(myWebData.strTemperature+"\xDF""C");
-  lcd.setCursor(lcdColumns-myWebData.strWindspeed.length()-3,1);  // Align left          
-  lcd.print(myWebData.strWindspeed+"m/s");
+  // read the value from the analog channel (default: 12 bits (0 – 4095) resolution)
+  iDigitalValue = analogRead(iPotPin);
+  int iPos = iDigitalValue / 240;
+  //Serial.print("digital value = ");
+  //Serial.println(iPos);      
 
-  delay(1000);
+  if( iPosOld != iPos ) {
+    lcd.clear();
+  }
+
+  if( iPos == 0 ){
+    lcd.setCursor(4,0);             // Move the cursor to row 0, column 4
+    lcd.print(timeClient.getFormattedTime()); 
+    lcd.setCursor(0,1);             // Move the cursor to row 1, column 0 
+    lcd.print(myWebData.strTemperature+"\xDF""C");
+    lcd.setCursor(lcdColumns-myWebData.strWindspeed.length()-3,1);  // Align left          
+    lcd.print(myWebData.strWindspeed+"m/s");
+   } else if( iPos>0 && iPos<17 ) {
+    lcd.setCursor(0,0);              
+    lcd.print(myWebData.strArrayForecastDateTime[iPos-1]);
+    lcd.setCursor(0,1);          
+    lcd.print("Speed: "+myWebData.strArrayForecastWindspeed[iPos-1]+"m/s");
+   } else if ( iPos==17 ) {
+    lcd.setCursor(0,0);             // Move the cursor to row 0, column 4
+    lcd.print("Calefactio v0.1"); 
+    lcd.setCursor(0,1);             // Move the cursor to row 1, column 0          
+    lcd.print(WiFi.localIP().toString()); 
+   }
+
+  iPosOld = iPos;
+  delay(500);
 
 }
