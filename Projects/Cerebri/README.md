@@ -8,6 +8,7 @@ What has been implemented:
 - Fetching current weather data and forecast of wind speed from openweathermap.org.
 - Getting temperature data of  a maximum of 3 attached DS18B20 sensors.
 - Displaying data on a LCD using a potentiometer as a device to scroll between different screens.
+- A HTML page delivered by a web server showing current weather, forecast data and sensor readings.
 
 To do:
 - Fetching price for produced electricity (https://www.energidataservice.dk/)
