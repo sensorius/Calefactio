@@ -5,9 +5,13 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
+// Webserver
+#include "WebServer.h"
+
 // DS18B20 Libs
 #include <OneWire.h>
 #include <DallasTemperature.h>
+
 
 //LCD Display
 //#define SDA 21    // Default SDA GPIO
@@ -77,6 +81,9 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", lUtcOffsetInSeconds);
 OneWire oneWire(SENSOR_PIN);  
 DallasTemperature DS18B20(&oneWire);
 
+// Our webserve on port 80
+WebServer server(80);
+
 
 void setup() {
   Serial.begin(115200); 
@@ -132,10 +139,65 @@ void setup() {
   lcd.clear();
   lcd.setCursor(0,0);  // Move cursor to column 0, row 0
   lcd.print("Sensors found:"+String(iSensorsFound));
+
+
+  server.on("/", wshandle_OnConnect);
+  //server.on("/post", wshandle_OnPost);
+  server.onNotFound(wshandle_NotFound);
+  server.begin();
+  Serial.println("HTTP server started");
   
   delay(5000);
   lcd.clear();
 }
+
+
+
+
+void wshandle_OnConnect() {
+  Serial.println("WebServerHandle: OnConnect");
+
+  String strCurrentWeather = "<h1>"+timeClient.getFormattedTime()+"<\h1>"\
+  "<h4><br>Temperature: "+myWebData.strTemperature+"&degC,"\
+  " Wind speed: "+myWebData.strWindspeed+"m/s</h4>";
+
+  String strForecastData = "<center><h4><table><tr><th align='left'>Datetime</th><th>    Wind speed</th></tr>";
+  for( int iCount=0; iCount<MAX_FORECAST_COUNT; iCount++ ) {
+    strForecastData += "<tr><td align='right'>"+myWebData.strArrayForecastDateTime[iCount]+\
+                       "</td><td align='right'>"+myWebData.strArrayForecastWindspeed[iCount]+"m/s</td></tr>";
+  }
+  strForecastData += "</table></h4></center>";
+
+ String strSensorData = "<h4>DS18B20 sensor readings"\
+                        "<br>S1: "+strSensorTemp[0]+"&degC,"\
+                        " S2: "+strSensorTemp[1]+"&degC,"\
+                        " S3: "+strSensorTemp[2]+"&degC</h4>";
+
+  String strHTML = "<!DOCTYPE html> <html>"\
+  "<head><meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=no'>"\
+  "<meta http-equiv='refresh' content='10'>"\
+  "<title>Calefactio</title>"\
+  "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}"\
+  "body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}"\
+  "p {font-size: 14px;color: #888;margin-bottom: 10px;}</style>"\
+  "\n</head><body>"\
+  "<h1>Cerebri calefacientis</h1>";
+
+  strHTML += strCurrentWeather;
+  strHTML += strSensorData;
+  strHTML += "<h4>2-day wind speed forecast<\h4>";
+  strHTML += strForecastData;
+
+  strHTML += "</body></html>";
+  
+  server.send(200, "text/html", strHTML);
+}
+
+void wshandle_NotFound(){
+  server.send(404, "text/plain", "Not found");
+}
+
+
 
 // Function to get weather data from openweathermap.org
 webDataType getDataFromServer(String strRequest) {
@@ -323,5 +385,7 @@ void loop() {
 
   // Store current position of potentiometer 
   iPosPotiOld = iPosPoti;
-  delay(200);
+  
+  server.handleClient();
+  delay(100);
 }
