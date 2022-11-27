@@ -158,7 +158,7 @@ void wshandle_OnConnect() {
   Serial.println("WebServerHandle: OnConnect");
 
   String strCurrentWeather = "<h1>"+timeClient.getFormattedTime()+"<\h1>"\
-  "<h5>(Automatic refresh interval of 10 seonds)<\h5>"\
+  "<h5>(Automatic refresh every 10 seonds)<\h5>"\
   "<h4><br>Temperature: "+myWebData.strTemperature+"&degC,"\
   " Wind speed: "+myWebData.strWindspeed+"m/s</h4>";
 
