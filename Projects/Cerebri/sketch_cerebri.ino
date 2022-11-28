@@ -1,4 +1,3 @@
-
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <LiquidCrystal_I2C.h>
@@ -12,6 +11,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
+
+#define SW_VERSION 0.1.1
 
 //LCD Display
 //#define SDA 21    // Default SDA GPIO
@@ -42,23 +43,33 @@ String strRequestWeatherDataFromServer = "https://api.openweathermap.org/data/2.
 String strRequestDataForecastFromServer = "https://api.openweathermap.org/data/2.5/"\
                                   "forecast?q=L%C3%B8kken,DK&units=metric&"\
                                   "appid=YOUR_APPID";
+
+String strRequestSpotPricesFromServer = "https://api.energidataservice.dk/dataset/elspotprices?"\
+                                        "start=now&limit=16&sort=HourUTC%20asc&filter={\"PriceArea\":[\"DK2\"]}";
+
+
+                                  
                           
 // Delays to update current weather data, forecast data and sensor readings 
 unsigned long ulTimerDelay = 60000*5;            // 5 minutes
 unsigned long ulTimerDelayForecast = 60000*60;   // 1 hour
 unsigned long ulTimerDelaySensors = 15000;       // 15 seconds
+unsigned long ulTimerDelaySpotPrices = 60000*60; // 1 hour
 
 unsigned long ulLastTime = ulTimerDelay;
 unsigned long ulLastTimeForecast = ulTimerDelayForecast;
 unsigned long ulLastTimeSensors = ulTimerDelaySensors;
+unsigned long ulLastTimeSpotPrices = ulTimerDelaySpotPrices;
 
 #define MAX_FORECAST_COUNT 16 
 
 struct webDataType {
-String strTemperature = "?";
-String strWindspeed = "?";
-String strArrayForecastWindspeed[MAX_FORECAST_COUNT] = {};
-String strArrayForecastDateTime[MAX_FORECAST_COUNT] = {};
+  String strTemperature = "?";
+  String strWindspeed = "?";
+  String strArrayForecastWindspeed[MAX_FORECAST_COUNT] = {};
+  String strArrayForecastDateTime[MAX_FORECAST_COUNT] = {};
+  String strArrayForecastDKKperKWh[MAX_FORECAST_COUNT] = {};
+  String strArrayForecastPriceDateTime[MAX_FORECAST_COUNT] = {};
 };
 
 struct webDataType myWebData;
@@ -138,7 +149,7 @@ void setup() {
   
   lcd.clear();
   lcd.setCursor(0,0);  // Move cursor to column 0, row 0
-  lcd.print("Sensors found:"+String(iSensorsFound));
+  lcd.print("Sensors found: "+String(iSensorsFound));
 
 
   server.on("/", wshandle_OnConnect);
@@ -158,21 +169,32 @@ void wshandle_OnConnect() {
   Serial.println("WebServerHandle: OnConnect");
 
   String strCurrentWeather = "<h1>"+timeClient.getFormattedTime()+"<\h1>"\
-  "<h5>(Automatic refresh every 10 seonds)<\h5>"\
-  "<h4><br>Temperature: "+myWebData.strTemperature+"&degC,"\
-  " Wind speed: "+myWebData.strWindspeed+"m/s</h4>";
+  "<h5>(Automatic refresh interval of 10 seonds)<\h5>"\
+  "<h4><br>Temperature: "+myWebData.strTemperature+" &degC,"\
+  " Wind speed: "+myWebData.strWindspeed+" m/s</h4>";
 
   String strForecastData = "<center><h4><table><tr><th align='left'>Datetime</th><th>    Wind speed</th></tr>";
   for( int iCount=0; iCount<MAX_FORECAST_COUNT; iCount++ ) {
     strForecastData += "<tr><td align='right'>"+myWebData.strArrayForecastDateTime[iCount]+\
-                       "</td><td align='right'>"+myWebData.strArrayForecastWindspeed[iCount]+"m/s</td></tr>";
+                       "</td><td align='right'>"+myWebData.strArrayForecastWindspeed[iCount]+" m/s</td></tr>";
   }
   strForecastData += "</table></h4></center>";
+
+  String strSpotPricesData = "<center><h4><table><tr><th align='left'>Datetime</th><th>DK 2 area spot price</th></tr>";
+  for( int iCount=0; iCount<MAX_FORECAST_COUNT; iCount++ ) {
+    strSpotPricesData += "<tr><td align='right'>"+myWebData.strArrayForecastPriceDateTime[iCount]+\
+                       "</td><td align='right'>"+myWebData.strArrayForecastDKKperKWh[iCount]+" DKK</td></tr>";
+  }
+  strSpotPricesData += "</table></h4></center>";
+
+  
 
  String strSensorData = "<h4>DS18B20 sensor readings"\
                         "<br>S1: "+strSensorTemp[0]+"&degC,"\
                         " S2: "+strSensorTemp[1]+"&degC,"\
                         " S3: "+strSensorTemp[2]+"&degC</h4>";
+
+ 
 
   String strHTML = "<!DOCTYPE html> <html>"\
   "<head><meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=no'>"\
@@ -186,8 +208,9 @@ void wshandle_OnConnect() {
 
   strHTML += strCurrentWeather;
   strHTML += strSensorData;
-  strHTML += "<h4>2-day wind speed forecast<\h4>";
+  strHTML += "<h4>Forecast data<\h4>";
   strHTML += strForecastData;
+  strHTML += strSpotPricesData;
 
   strHTML += "</body></html>";
   
@@ -259,10 +282,33 @@ webDataType getDataFromServer(String strRequest) {
             myWebData.strArrayForecastDateTime[iCounter] = payload.substring(iValuePosStart,iValuePosEnd);
             Serial.println("Data:"+myWebData.strArrayForecastDateTime[iCounter]);
           }
-          
+
+
+        } else if ( strRequest.indexOf("elspotprices?") >= 0  ) {
+          Serial.println("Extracting price data");
+
+          iValuePosStart = 0;
+          iValuePosEnd = 0;
+          for ( int iCounter = 0; iCounter < MAX_FORECAST_COUNT; iCounter++ ) {
+            iValuePosStart = payload.indexOf("SpotPriceDKK", iValuePosStart) + 14;
+            iValuePosEnd = payload.indexOf(",", iValuePosStart );
+            myWebData.strArrayForecastDKKperKWh[iCounter] = payload.substring(iValuePosStart, iValuePosEnd);
+            Serial.println("Data:" + myWebData.strArrayForecastDKKperKWh[iCounter]);
+          }
+
+          iValuePosStart = 0;
+          iValuePosEnd = 0;
+          for ( int iCounter = 0; iCounter < MAX_FORECAST_COUNT; iCounter++ ) {
+            iValuePosStart = payload.indexOf("HourUTC\":", iValuePosStart) + 10;
+            iValuePosEnd = payload.indexOf(",", iValuePosStart ) - 4;
+            myWebData.strArrayForecastPriceDateTime[iCounter] = payload.substring(iValuePosStart, iValuePosEnd);
+            myWebData.strArrayForecastPriceDateTime[iCounter].replace("T"," ");
+            Serial.println("Data:" + myWebData.strArrayForecastPriceDateTime[iCounter]);
+        }
+               
         // Ooops, an error in the request string defintion?  
         } else {
-          Serial.println("Error, weather nor forecast found - Check HTML Request:");
+          Serial.println("Error, weather nor forecast nor elspotprices found - Check HTML Request:");
           Serial.println(strRequest);
         } 
        
@@ -327,9 +373,18 @@ void loop() {
   if ((millis() - ulLastTimeForecast) > ulTimerDelayForecast) {
     myWebData = getDataFromServer(strRequestDataForecastFromServer);
     //Serial.println("Current outdoor temperature: "+myWebData.strTemperature+"°C");
-    //Serial.println("Current wind speed "+myWebData.strWindspeed+"m/s");
+    //Serial.println("Current wind speed "+myWebData.strArrayForecastPriceDateTime);
     ulLastTimeForecast = millis();
   }
+
+  // Get spotPrice data
+  if ((millis() - ulLastTimeSpotPrices) > ulTimerDelaySpotPrices) {
+    myWebData = getDataFromServer(strRequestSpotPricesFromServer);
+    //Serial.print("Spot price: "+myWebData.strArrayForecastDKKperKWh[0]+"DKK - ");
+    //Serial.println(myWebData.strArrayForecastDateTime[0]);
+    ulLastTimeSpotPrices = millis();
+  }
+
 
   // Get current 
   timeClient.update();
@@ -356,13 +411,22 @@ void loop() {
     lcd.setCursor(iLcdColumns-myWebData.strWindspeed.length()-3,1);  // Align right          
     lcd.print(myWebData.strWindspeed+"m/s");
 
-  // Show 16 sets of wind speed forecast data  
-  } else if( iPosPoti>0 && iPosPoti<17 ) {
+  // Show 8 sets of wind speed forecast data  
+  } else if( iPosPoti>0 && iPosPoti<9 ) {
      if( iPosPotiOld != iPosPoti ) {
        lcd.setCursor(0,0);          // Move cursor to column 0, row 0   
        lcd.print(myWebData.strArrayForecastDateTime[iPosPoti-1]);
        lcd.setCursor(0,1);          // Move cursor to column 0, row 1
        lcd.print("Speed: "+myWebData.strArrayForecastWindspeed[iPosPoti-1]+"m/s");
+     }
+
+  // Show 8 sets of spot price forecast data  
+  } else if( iPosPoti>8 && iPosPoti<17 ) {
+     if( iPosPotiOld != iPosPoti ) {
+       lcd.setCursor(0,0);          // Move cursor to column 0, row 0   
+       lcd.print(myWebData.strArrayForecastPriceDateTime[iPosPoti-1]);
+       lcd.setCursor(0,1);          // Move cursor to column 0, row 1
+       lcd.print(" "+myWebData.strArrayForecastDKKperKWh[iPosPoti-1]+" DKK");
      }
 
   // Show assigned local IP and signal strength 
