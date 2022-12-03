@@ -11,6 +11,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
+// Time
+#include <Time.h>
 
 #define SW_VERSION 0.1.1
 
@@ -66,6 +68,7 @@ unsigned long ulLastTimeSpotPrices = ulTimerDelaySpotPrices;
 struct webDataType {
   String strTemperature = "?";
   String strWindspeed = "?";
+  int    iTotalForecastPrice = 0;
   String strArrayForecastWindspeed[MAX_FORECAST_COUNT] = {};
   String strArrayForecastDateTime[MAX_FORECAST_COUNT] = {};
   String strArrayForecastDKKperKWh[MAX_FORECAST_COUNT] = {};
@@ -181,7 +184,7 @@ void wshandle_OnConnect() {
   strForecastData += "</table></h4></center>";
 
   String strSpotPricesData = "<center><h4><table><tr><th align='left'>Datetime</th><th>DK 2 area spot price</th></tr>";
-  for( int iCount=0; iCount<MAX_FORECAST_COUNT; iCount++ ) {
+  for( int iCount=0; iCount<myWebData.iTotalForecastPrice; iCount++ ) {
     strSpotPricesData += "<tr><td align='right'>"+myWebData.strArrayForecastPriceDateTime[iCount]+\
                        "</td><td align='right'>"+myWebData.strArrayForecastDKKperKWh[iCount]+" DKK</td></tr>";
   }
@@ -276,7 +279,7 @@ webDataType getDataFromServer(String strRequest) {
 
           // Get corresponding date/time of forecast -> "dt_txt"
           iValuePosStart=0, iValuePosEnd=0;
-          for( int iCounter = 0; iCounter <MAX_FORECAST_COUNT; iCounter++ ) {
+          for( int iCounter = 0; iCounter < MAX_FORECAST_COUNT; iCounter++ ) {
             iValuePosStart = payload.indexOf("dt_txt",iValuePosStart)+9;
             iValuePosEnd = payload.indexOf(",",iValuePosStart )-5;
             myWebData.strArrayForecastDateTime[iCounter] = payload.substring(iValuePosStart,iValuePosEnd);
@@ -289,7 +292,20 @@ webDataType getDataFromServer(String strRequest) {
 
           iValuePosStart = 0;
           iValuePosEnd = 0;
-          for ( int iCounter = 0; iCounter < MAX_FORECAST_COUNT; iCounter++ ) {
+
+          int iTotalPosStart = payload.indexOf("Total", 0) + 10;
+          int iTotalPosEnd = payload.indexOf(",", iTotalPosStart );
+          String strTotal = payload.substring(iTotalPosStart, iTotalPosEnd);
+          myWebData.iTotalForecastPrice = strTotal.toInt();
+
+          if( myWebData.iTotalForecastPrice > MAX_FORECAST_COUNT ){
+            myWebData.iTotalForecastPrice = MAX_FORECAST_COUNT;
+          }
+          
+          Serial.print("Total: ");
+          Serial.println(myWebData.iTotalForecastPrice);
+          
+          for ( int iCounter = 0; iCounter < myWebData.iTotalForecastPrice; iCounter++ ) {
             iValuePosStart = payload.indexOf("SpotPriceDKK", iValuePosStart) + 14;
             iValuePosEnd = payload.indexOf(",", iValuePosStart );
             myWebData.strArrayForecastDKKperKWh[iCounter] = payload.substring(iValuePosStart, iValuePosEnd);
@@ -298,7 +314,7 @@ webDataType getDataFromServer(String strRequest) {
 
           iValuePosStart = 0;
           iValuePosEnd = 0;
-          for ( int iCounter = 0; iCounter < MAX_FORECAST_COUNT; iCounter++ ) {
+          for ( int iCounter = 0; iCounter < myWebData.iTotalForecastPrice; iCounter++ ) {
             iValuePosStart = payload.indexOf("HourUTC\":", iValuePosStart) + 10;
             iValuePosEnd = payload.indexOf(",", iValuePosStart ) - 4;
             myWebData.strArrayForecastPriceDateTime[iCounter] = payload.substring(iValuePosStart, iValuePosEnd);
@@ -345,6 +361,26 @@ int getDataFromSensors() {
   return 0;
 }
 
+
+// Calculation of time difference
+int getTimeDifferenceInMinutes(String strTimeDate) {
+
+  String strCurrentTime = timeClient.getFormattedTime();
+  Serial.print("Current time: ");
+  Serial.println(strCurrentTime);
+/*
+int splitT = formattedDate.indexOf("T");
+dayStamp = formattedDate.substring(0, splitT);
+Serial.println(dayStamp);
+// Extract time
+timeStamp = formattedDate.substring(splitT+1, formattedDate.length()-1);
+Serial.println(timeStamp);
+*/
+
+  return -1;
+}
+
+
 // Main loop
 void loop() {
 
@@ -359,6 +395,9 @@ void loop() {
     //}
     
     ulLastTimeSensors = millis();
+
+    String strTest = "2022:12:03 12:03";
+    getTimeDifferenceInMinutes(strTest);
   }
 
   // Get current weather data
@@ -386,8 +425,11 @@ void loop() {
   }
 
 
-  // Get current 
+  // Get current date/time
   timeClient.update();
+  //while(!timeClient.update()) {
+  //  timeClient.forceUpdate();
+  //}
 
   // Read value from potentiometer's analog channel (default: 12 bits (0 – 4095) resolution)
   iDigitalValue = analogRead(POTENTIOMETER_PIN);
@@ -423,10 +465,17 @@ void loop() {
   // Show 8 sets of spot price forecast data  
   } else if( iPosPoti>8 && iPosPoti<17 ) {
      if( iPosPotiOld != iPosPoti ) {
-       lcd.setCursor(0,0);          // Move cursor to column 0, row 0   
-       lcd.print(myWebData.strArrayForecastPriceDateTime[iPosPoti-1]);
-       lcd.setCursor(0,1);          // Move cursor to column 0, row 1
-       lcd.print(" "+myWebData.strArrayForecastDKKperKWh[iPosPoti-1]+" DKK");
+       if( iPosPoti-9 < myWebData.iTotalForecastPrice ) {
+         lcd.setCursor(0,0);          // Move cursor to column 0, row 0 
+         lcd.print(myWebData.strArrayForecastPriceDateTime[iPosPoti-9]); 
+         lcd.setCursor(0,1);          // Move cursor to column 0, row 1
+         lcd.print(" "+myWebData.strArrayForecastDKKperKWh[iPosPoti-9]+" DKK");     
+       } else {
+        lcd.setCursor(0,0);          // Move cursor to column 0, row 0 
+        lcd.print("n/a");
+        lcd.setCursor(0,1);          // Move cursor to column 0, row 1 
+        lcd.print("n/a");        
+       }
      }
 
   // Show assigned local IP and signal strength 
