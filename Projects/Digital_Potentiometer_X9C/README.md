@@ -28,3 +28,8 @@ Hardware:
 Libraries used:
 
 DigiPotX9Cxxx Version 0.1.0
+
+
+Thoughts:
+
+Possible digital potentiometer substitue, higher resolution and 2 potis onboard: https://opencircuit.nl/product/fermion-dual-digital-potentiometer-100k
