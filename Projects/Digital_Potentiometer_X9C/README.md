@@ -27,7 +27,7 @@ Hardware:
 
 Libraries used:
 
-DigiPotX9Cxxx Version 0.1.0
+* DigiPotX9Cxxx Version 0.1.0
 
 
 Thoughts:
