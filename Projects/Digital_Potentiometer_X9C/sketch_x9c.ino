@@ -6,7 +6,7 @@
  RW  - GPIO34 ADC1_CH6 for analogRead
  RL  - GND
  CS  - GPIO35 ADC1_CH7
- VCC - 3.3V
+ VCC - 5V
  */
 
 // Image
