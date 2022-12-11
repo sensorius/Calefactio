@@ -15,11 +15,15 @@ Cables
 * grey   GPIO34 ADC1_CH6 -> RW
 
 
+<p align="center">
+  <img src="https://github.com/sensorius/Calefactio/blob/main/Blobs/Calefactio_X9C_01.jpg?raw=true" alt="X9C"/>
+</p>
+
 Hardware:
 
 * Freenove ESP32-WROVER-Dev
+* X9C104S 100KΩ 
 
- 
 
 Libraries used:
 
