@@ -33,15 +33,22 @@ String strWindSpeedInit[MAX_FORECAST_COUNT] = { "6", "6", "5", "5", "4", "4", "5
 String strOutdoorTempInit[MAX_FORECAST_COUNT] = { "9", "8", "7", "6", "6", "5", "5", "4", "4", "4"};
 
 
+typedef struct {
+  String strProbabilityWindElectricity = "0";
+  String strEffectiveElectricityFee = "0";
+  String strEffectiveElectricityCost = "0";
+} calculatedDataType;
+
+calculatedDataType calculatedData[MAX_FORECAST_COUNT];
+
 
 String strHeatingBufferTemp = "63.1";
 String strHeatingBufferFakeTemp = "0.0";
 
 String strHeatingBufferSize = "1000";
-String strElectricityImportCharge = "1.5";
+String strElectricityImportFee = "1.5";
 
 
-float fProbabilityWindElectricity = -1.0;
 
 
 
@@ -109,7 +116,7 @@ void wshandle_OnConnect() {
 
 
   strHTML +="Heating buffer size [l]: <input type=number name=\"heatingBufferSize\" value="+strHeatingBufferSize+" min=0 max=10000 step=1>";
-  strHTML +="<br>Electricity import charge [kr&#47;kWh]: <input type=number name=\"electricityImportCharge\" value="+strElectricityImportCharge+" min=0 max=100 step=0.01>";
+  strHTML +="<br>Electricity import charge [kr&#47;kWh]: <input type=number name=\"electricityImportFee\" value="+strElectricityImportFee+" min=0 max=100 step=0.01>";
   strHTML +="<br>Heating buffer temp. [&#176;C]: <input type=number name=\"heatingBufferTemp\" value="+strHeatingBufferTemp+" min=0 max=100 step=0.1><br>";
   
   strHTML += "<br><table>";
@@ -157,15 +164,22 @@ void wshandle_OnConnect() {
 
   strHTML += "<tr><td>Probability wind electricity:</td>";
   for(int i=0; i<MAX_FORECAST_COUNT; i++) {
-    String strValue = String(calcProbabilityWindElectricity(forecastData[i].strWindSpeed),1);
-    strHTML += "<td>"+strValue+"</td>";
+    strHTML += "<td>"+calculatedData[i].strProbabilityWindElectricity+"</td>";
   } strHTML += "</tr>";
 
+  strHTML += "<tr><td>Effective electricity fee [kr&#47;kWh]:</td>";
+  for(int i=0; i<MAX_FORECAST_COUNT; i++) {
+    strHTML += "<td>"+calculatedData[i].strEffectiveElectricityFee+"</td>";
+  } strHTML += "</tr>";
+
+  strHTML += "<tr><td>Effective electricity cost incl. fee [kr&#47;kWh]:</td>";
+  for(int i=0; i<MAX_FORECAST_COUNT; i++) {
+    strHTML += "<td>"+calculatedData[i].strEffectiveElectricityCost+"</td>";
+  } strHTML += "</tr>";
+
+
   strHTML += "</table>";
-
-
   strHTML += "</center>";
-
   strHTML += "</body></html>"; 
   
   server.send(200, "text/html", strHTML);
@@ -178,7 +192,7 @@ void wshandle_OnCalc() {
 
   strHeatingBufferTemp = server.arg("heatingBufferTemp");
   strHeatingBufferSize = server.arg("heatingBufferSize");
-  strElectricityImportCharge = server.arg("electricityImportCharge");
+  strElectricityImportFee = server.arg("electricityImportFee");
 
   for(int i=0; i<MAX_FORECAST_COUNT; i++) {
     String strName = "outdoorTemp_"+String(i); forecastData[i].strOutdoorTemp = server.arg(strName);
@@ -189,6 +203,12 @@ void wshandle_OnCalc() {
   float fHeatingBufferTemp = 76.4;
   strHeatingBufferFakeTemp =  String(fHeatingBufferTemp,1);
 
+  for(int i=0; i<MAX_FORECAST_COUNT; i++) {
+    calculatedData[i].strProbabilityWindElectricity = String(calcProbabilityWindElectricity(forecastData[i].strWindSpeed),1);
+    calculatedData[i].strEffectiveElectricityFee = String(calcEffectiveElectricityFee(calculatedData[i].strProbabilityWindElectricity,strElectricityImportFee));
+    calculatedData[i].strEffectiveElectricityCost = String(calculatedData[i].strEffectiveElectricityFee.toFloat()+forecastData[i].strSpotPrice.toFloat(),2);
+  }
+  
   server.sendHeader("Location", "/",true);  
   server.send(302, "text/plain", "");
   
@@ -214,6 +234,15 @@ float calcProbabilityWindElectricity(String strWindSpeed)
   else
     fRetVal = 1.0;
   
+  return fRetVal;
+}
+
+float calcEffectiveElectricityFee(String strProbabiltyWindElectricity, String strElectricityImportFee) {
+  
+  float fProbabiltyWindElectricity = strProbabiltyWindElectricity.toFloat();
+  float fElectricityImportFee = strElectricityImportFee.toFloat();
+  float fRetVal = (1-fProbabiltyWindElectricity)*fElectricityImportFee;
+
   return fRetVal;
 }
 
